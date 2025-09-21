@@ -1,113 +1,126 @@
+"""
+Implementation of the Random Page Replacement Algorithm. 
+Written by Hung a1884747
+"""
+
+
 from mmu import MMU
 import random
-from collections import deque
+
 
 class RandMMU(MMU):
+
+
     def __init__(self, frames):
-        # number of physical frames
-        self.num_frames = frames
-        # frame -> page_number (or None)
-        self.frames = [None] * frames
-        # page table: page_number -> {frame, valid, dirty, use}
-        self.pt = {}
-        # free frame queue
-        self.free_frames = deque(range(frames))
+        self.frames = frames
+        self.page_table = {}  # page_number -> {'frame': frame_number, 'modified': bool}
+        self.free_frames = list(range(frames))  # list of free frames
         # stats
-        self.disk_reads = 0
-        self.disk_writes = 0
-        self.page_faults = 0
-        # debug flag
-        self._debug = False
+        self.total_disk_reads = 0
+        self.total_disk_writes = 0
+        self.total_page_faults = 0
+        # debug
+        self.verbose = False
+        
 
-    def set_debug(self):
-        self._debug = True
+    def _evict_random_page(self):
+        # randomly choose victim page to evict
+        victim_page = random.choice(list(self.page_table.keys()))
+        victim_info = self.page_table[victim_page]
+        frame = victim_info['frame']
+        if self.verbose:
+            print(f"Randomly selected page {victim_page} in frame {frame} for eviction")
+        
+        # stat update
+        if victim_info['modified']:
+            self.total_disk_writes += 1
+            if self.verbose:
+                print(f"Writing modified page {victim_page} to disk")
+        
+        # remove victim from page table, but still exists on disk
+        del self.page_table[victim_page]
+        if self.verbose:
+            print(f"Evicted page {victim_page} from frame {frame}")
+        return frame
 
-    def reset_debug(self):
-        self._debug = False
-
-    def _debug_print(self, *args):
-        if self._debug:
-            print(*args)
-
-    def _allocate_free_or_victim(self):
-        """Return (frame_index, victim_page_or_None). If a free frame exists, returns it with victim None."""
-        if self.free_frames:
-            frame = self.free_frames.popleft()
-            return frame, None
-        # choose random occupied frame
-        idx = random.randrange(self.num_frames)
-        return idx, self.frames[idx]
-
-    def _load_page_into_frame(self, page_number, frame, is_write):
-        """Mark page loaded into frame and update page table/stats."""
-        # incoming disk read to bring page in
-        self.disk_reads += 1
-        self.frames[frame] = page_number
-        pte = self.pt.get(page_number)
-        if pte is None:
-            pte = {'frame': frame, 'valid': True, 'dirty': bool(is_write), 'use': True}
-            self.pt[page_number] = pte
-        else:
-            pte['frame'] = frame
-            pte['valid'] = True
-            pte['dirty'] = bool(is_write)
-            pte['use'] = True
-
-        self._debug_print(f"Loaded page {page_number} into frame {frame} (dirty={pte['dirty']})")
 
     def read_memory(self, page_number):
-        # read -> no change to dirty on hit
-        pte = self.pt.get(page_number)
-        if pte and pte['valid']:
-            # hit
-            pte['use'] = True
-            self._debug_print(f"READ HIT page {page_number} in frame {pte['frame']}")
+        if self.verbose:
+            print(f"Reading page {page_number}")
+        
+        # check for hit
+        if page_number in self.page_table:
+            if self.verbose:
+                frame = self.page_table[page_number]
+                print(f"Page {page_number} found in frame {frame}")
             return
-        # miss -> page fault
-        self.page_faults += 1
-        self._debug_print(f"READ MISS page {page_number}")
-        frame, victim_page = self._allocate_free_or_victim()
-        if victim_page is not None:
-            # evict victim
-            vpte = self.pt[victim_page]
-            self._debug_print(f"  Removing page {victim_page} from frame {frame} (dirty={vpte['dirty']})")
-            if vpte['dirty']:
-                self.disk_writes += 1
-                self._debug_print(f"    Writing page {victim_page} to disk")
-            vpte['valid'] = False
-            vpte['frame'] = None
-            vpte['use'] = False
-        self._load_page_into_frame(page_number, frame, is_write=False)
+        
+        # miss/page-fault, therefore must be read from disk
+        self.total_disk_reads += 1
+        self.total_page_faults += 1
+        if self.verbose:
+            print(f"Page fault for page {page_number}")
+        
+        # find empty frame
+        if self.free_frames:
+            frame = self.free_frames.pop(0)
+            if self.verbose:
+                print(f"Using free frame {frame}")
+        else:
+            # evict with random replacement policy
+            frame = self._evict_random_page()
+            
+        # load page into frame
+        self.page_table[page_number] = {'frame': frame, 'modified': False}
+        if self.verbose:
+            print(f"Loaded page {page_number} into frame {frame}")
+    
 
     def write_memory(self, page_number):
-        # write -> set dirty
-        pte = self.pt.get(page_number)
-        if pte and pte['valid']:
-            # hit
-            pte['dirty'] = True
-            pte['use'] = True
-            self._debug_print(f"WRITE HIT page {page_number} in frame {pte['frame']} (now dirty)")
+        if self.verbose:
+            print(f"Writing to page {page_number}")
+            
+        # check for hit
+        if page_number in self.page_table:
+            self.page_table[page_number]['modified'] = True
+            if self.verbose:
+                frame = self.page_table[page_number]['frame']
+                print(f"Page {page_number} in frame {frame} marked as modified")
             return
-        # miss
-        self.page_faults += 1
-        self._debug_print(f"WRITE MISS page {page_number}")
-        frame, victim_page = self._allocate_free_or_victim()
-        if victim_page is not None:
-            vpte = self.pt[victim_page]
-            self._debug_print(f"  Removing page {victim_page} from frame {frame} (dirty={vpte['dirty']})")
-            if vpte['dirty']:
-                self.disk_writes += 1
-                self._debug_print(f"    Writing page {victim_page} to disk")
-            vpte['valid'] = False
-            vpte['frame'] = None
-            vpte['use'] = False
-        self._load_page_into_frame(page_number, frame, is_write=True)
+        
+        # miss/page-fault, therefore must be read from disk
+        self.total_page_faults += 1
+        self.total_disk_reads += 1
 
+        if self.verbose:
+            print(f"Page fault for page {page_number} (write)")
+        
+        # find empty frame
+        if self.free_frames:
+            frame = self.free_frames.pop(0)
+            if self.verbose:
+                print(f"Using free frame {frame}")
+        else:
+            # evict with random replacement policy
+            frame = self._evict_random_page()
+            
+        # load page into frame
+        self.page_table[page_number] = {'frame': frame, 'modified': True}
+        if self.verbose:
+            print(f"Loaded page {page_number} into frame {frame} and marked as modified")
+    
+
+    # debug methods
+    def set_debug(self):
+        self.verbose = True
+    def reset_debug(self):
+        self.verbose = False
+
+
+    # stats for memsim.py
     def get_total_disk_reads(self):
-        return self.disk_reads
-
+        return self.total_disk_reads
     def get_total_disk_writes(self):
-        return self.disk_writes
-
+        return self.total_disk_writes
     def get_total_page_faults(self):
-        return self.page_faults
+        return self.total_page_faults
