@@ -28,7 +28,7 @@ class ClockMMU(MMU):
 
     def _find_victim_clock(self):
         """
-        Classic Clock / Second-Chance algorithm (no special clean-page preference).
+        Classic Clock / Second-Chance algorithm
         Scan frames circularly starting at clock_hand:
           - if page.use == 0 -> choose it (victim)
           - else set page.use = 0 and advance
