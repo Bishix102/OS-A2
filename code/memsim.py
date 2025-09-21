@@ -82,6 +82,7 @@ def main():
             no_events += 1
 
     # TODO: Print results
+    print(f"===== Result =====")
     print(f"total memory frames: {frames}")
     print(f"events in trace: {no_events}")
     print(f"total disk reads: {mmu.get_total_disk_reads()}")

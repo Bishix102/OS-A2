@@ -70,7 +70,7 @@ class RandMMU(MMU):
         if victim_page is not None:
             # evict victim
             vpte = self.pt[victim_page]
-            self._debug_print(f"  Evicting page {victim_page} from frame {frame} (dirty={vpte['dirty']})")
+            self._debug_print(f"  Removing page {victim_page} from frame {frame} (dirty={vpte['dirty']})")
             if vpte['dirty']:
                 self.disk_writes += 1
                 self._debug_print(f"    Writing page {victim_page} to disk")
@@ -94,7 +94,7 @@ class RandMMU(MMU):
         frame, victim_page = self._allocate_free_or_victim()
         if victim_page is not None:
             vpte = self.pt[victim_page]
-            self._debug_print(f"  Evicting page {victim_page} from frame {frame} (dirty={vpte['dirty']})")
+            self._debug_print(f"  Removing page {victim_page} from frame {frame} (dirty={vpte['dirty']})")
             if vpte['dirty']:
                 self.disk_writes += 1
                 self._debug_print(f"    Writing page {victim_page} to disk")

@@ -81,7 +81,7 @@ class ClockMMU(MMU):
         else:
             frame, victim_page = self._find_victim_clock()
             ventry = self.pt[victim_page]
-            self._debug_print(f"  Evicting page {victim_page} from frame {frame} (dirty={ventry['dirty']}, use={ventry['use']})")
+            self._debug_print(f"  Removing page {victim_page} from frame {frame} (dirty={ventry['dirty']}, use={ventry['use']})")
             if ventry['dirty']:
                 self.disk_writes += 1
                 self._debug_print(f"    Writing page {victim_page} to disk")
@@ -108,7 +108,7 @@ class ClockMMU(MMU):
         else:
             frame, victim_page = self._find_victim_clock()
             ventry = self.pt[victim_page]
-            self._debug_print(f"  Evicting page {victim_page} from frame {frame} (dirty={ventry['dirty']}, use={ventry['use']})")
+            self._debug_print(f"  Removing page {victim_page} from frame {frame} (dirty={ventry['dirty']}, use={ventry['use']})")
             if ventry['dirty']:
                 self.disk_writes += 1
                 self._debug_print(f"    Writing page {victim_page} to disk")

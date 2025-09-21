@@ -30,7 +30,7 @@ class LruMMU(MMU):
         if self._debug:
             print(*args)
 
-    def _evict_lru(self):
+    def _remove_lru(self):
         # pop first item from OrderedDict (least recently used)
         if not self.lru:
             raise RuntimeError("LRU eviction requested but no pages present")
@@ -71,9 +71,9 @@ class LruMMU(MMU):
         if self.free_frames:
             frame = self.free_frames.popleft()
         else:
-            frame, victim_page = self._evict_lru()
+            frame, victim_page = self._remove_lru()
             ventry = self.pt[victim_page]
-            self._debug_print(f"  Evicting page {victim_page} from frame {frame} (dirty={ventry['dirty']})")
+            self._debug_print(f"  Removing page {victim_page} from frame {frame} (dirty={ventry['dirty']})")
             if ventry['dirty']:
                 self.disk_writes += 1
                 self._debug_print(f"    Writing page {victim_page} to disk")
@@ -99,9 +99,9 @@ class LruMMU(MMU):
         if self.free_frames:
             frame = self.free_frames.popleft()
         else:
-            frame, victim_page = self._evict_lru()
+            frame, victim_page = self._remove_lru()
             ventry = self.pt[victim_page]
-            self._debug_print(f"  Evicting page {victim_page} from frame {frame} (dirty={ventry['dirty']})")
+            self._debug_print(f"  Removing page {victim_page} from frame {frame} (dirty={ventry['dirty']})")
             if ventry['dirty']:
                 self.disk_writes += 1
                 self._debug_print(f"    Writing page {victim_page} to disk")
